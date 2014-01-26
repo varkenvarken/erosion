@@ -16,12 +16,15 @@ Dependencies:
 =============
 
 Blender 2.69
+
 Python 3.3.x        (Blender 2.69 comes with Python 3.3)
+
 Numpy               (See installation instructions for Windows below)
                     http://www.numpy.org/
                     
 Numexpr             (Optional but *highly* recommended. See installation instructions for Windows below)
                     http://code.google.com/p/numexpr/
+
 psutil              (Optional. See installation instructions for Windows below)
                     http://code.google.com/p/psutil/
                     
