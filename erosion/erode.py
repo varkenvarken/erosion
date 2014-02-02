@@ -49,6 +49,7 @@ class Grid:
         self.center = np.zeros([size,size], dtype)
         self.water = None
         self.sediment = None
+        self.rainmap = None
         self.minx=None
         self.miny=None
         self.maxx=None
@@ -151,14 +152,26 @@ class Grid:
         #  we might catch a reshape error that will occur if nx*ny != # of vertices (if we are not dealing with a heightfield but with a mesh with duplicate x,y coords, like an axis aligned cube
         self.center=np.array([c[2] for c in verts],dtype=np.single).reshape(nx,ny)
         self.center=(self.center-np.amin(self.center))*self.zscale
-
+        if self.rainmap is not None:
+            rainmap = sorted(list({ tuple(t) for t in self.rainmap[::] }))
+            self.rainmap=np.array([c[2] for c in rainmap],dtype=np.single).reshape(nx,ny)
+        
     @staticmethod
-    def fromBlenderMesh(me):
+    def fromBlenderMesh(me, vg):
         g=Grid()
         g.center=np.asarray(list(tuple(v.co) for v in me.vertices), dtype=np.single )
+        g.rainmap=None
+        if vg is not None:
+            for v in me.vertices:
+                vg.add([v.index],0.0,'ADD')
+            g.rainmap=np.asarray(list( (v.co[0], v.co[1], vg.weight(v.index)) for v in me.vertices), dtype=np.single )
         g._sort()
+        print('rainmap',np.max(g.rainmap),np.min(g.rainmap))
         return g
 
+    def setrainmap(self, rainmap):
+        self.rainmap = rainmap
+        
     def _verts(self):
         a=self.center / self.zscale
         minx=0.0 if self.minx is None else self.minx
@@ -266,8 +279,8 @@ class Grid:
         self.maxrss = max(getmemsize(), self.maxrss)
         return self.center
 
-    def rain(self, amount, variance=0):
-        self.water += (1.0 - np.random.random(self.water.shape) * variance) * amount
+    def rain(self, amount=1, variance=0, userainmap=False):
+        self.water += (1.0 - np.random.random(self.water.shape) * variance) * (amount if ((self.rainmap is None) or (not userainmap)) else self.rainmap * amount) 
         
     def spring(self, amount, px, py, radius): # px, py and radius are all fractions
         nx, ny = self.center.shape
@@ -355,9 +368,9 @@ class Grid:
           rock[center] = where(rcc<0,0,rcc) # there isn't really a bottom to the rock but negative values look ugly
           sediment[center] = scc + ds
       
-    def fluvial_erosion(self, rain, Kc, Ks, Kd, Ka, Kspring, Kspringx, Kspringy, Kspringr, numexpr):
+    def fluvial_erosion(self, rainamount, rainvariance, userainmap, Kc, Ks, Kd, Ka, Kspring, Kspringx, Kspringy, Kspringr, numexpr):
         self.init_water_and_sediment()
-        self.rain(rain)
+        self.rain(rainamount, rainvariance, userainmap)
         self.zeroedge(self.water)
         self.zeroedge(self.sediment)
         self.spring(Kspring, Kspringx, Kspringy, Kspringr)
